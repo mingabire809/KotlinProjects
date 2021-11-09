@@ -1,5 +1,6 @@
 package com.example.eproject
 
+import android.app.ProgressDialog
 import android.content.Intent
 import android.graphics.Color
 import androidx.appcompat.app.AppCompatActivity
@@ -9,27 +10,54 @@ import android.text.TextUtils
 import android.text.TextWatcher
 import android.text.method.HideReturnsTransformationMethod
 import android.text.method.PasswordTransformationMethod
+import android.util.Log
 import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.widget.addTextChangedListener
+import com.android.volley.Response
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import kotlinx.android.synthetic.main.activity_sign_up.*
+import org.json.JSONObject
 
 class Sign_up : AppCompatActivity(), TextWatcher {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sign_up)
-        val password = findViewById<EditText>(R.id.registering_password) as EditText
+        var firstName = findViewById(R.id.first_name) as EditText
+        var lastName = findViewById(R.id.last_name) as EditText
+        var email = findViewById(R.id.email) as EditText
+        var phoneNumber = findViewById(R.id.phone_number) as EditText
+        var password = findViewById<EditText>(R.id.registering_password) as EditText
         password.addTextChangedListener(this)
 
         save.setOnClickListener {
-            if (registering_password.text.toString() == confirm_password.text.toString()){
-            val home = Intent(this, Home::class.java)
-            startActivity(home)
+            if(firstName.text.isNullOrBlank() ||
+                lastName.text.isNullOrBlank() ||
+                email.text.isNullOrBlank() ||
+                password.text.isNullOrBlank() ||
+                confirm_password.text.isNullOrBlank() ||
+                phoneNumber.text.isNullOrBlank()){
+                val requirement = Toast.makeText(
+                    this,
+                    "Please fill all the required fields",
+                    Toast.LENGTH_LONG
+                )
+                requirement.show()
+            }
+            else if (registering_password.text.toString() != confirm_password.text.toString()){
+                val mistake:Toast = Toast.makeText(this,"Passwords do not match",Toast.LENGTH_LONG)
+                mistake.show()
             }else{
-               val mistake:Toast = Toast.makeText(this,"Passwords do not match",Toast.LENGTH_LONG)
-               mistake.show()
+                httpRequest(
+                    firstName.text.toString().trim(),
+                    lastName.text.toString().trim(),
+                    phoneNumber.text.toString().trim(),
+                    email.text.toString().trim(),
+                    password.text.toString().trim()
+                )
             }
         }
 
@@ -59,6 +87,68 @@ class Sign_up : AppCompatActivity(), TextWatcher {
             }
         }
 
+    }
+    private fun httpRequest(
+        firstName: String,
+        lastName: String,
+        phoneNumber: String,
+        email: String,
+        password: String
+    ) {
+        val queue = Volley.newRequestQueue(this)
+        val url = "http://192.168.25.215/login/register.php"
+
+        val progress = ProgressDialog(this)
+        progress.setMessage("Please Wait...")
+        progress.setProgressStyle(ProgressDialog.STYLE_SPINNER)
+        progress.show()
+
+        val stringReq: StringRequest =
+            object : StringRequest(
+                Method.POST, url,
+                Response.Listener { response ->
+                    // response
+                    progress.hide()
+
+                    val strResp = response.toString()
+                    Log.d("API_M", strResp)
+
+                    val obj = JSONObject(response)
+                    val success = obj.getString("success")
+
+                    if (success == "1") {
+                        Toast.makeText(this, "Welcome to Eproject", Toast.LENGTH_LONG).show()
+                        startActivity(Intent(this, Home::class.java))
+                        overridePendingTransition(0, 0)
+
+                    } else if (success == "2") {
+                        Toast.makeText(this, "User already exist", Toast.LENGTH_SHORT)
+                            .show()
+                    } else {
+                        Toast.makeText(this, "try again later", Toast.LENGTH_SHORT).show()
+                    }
+
+                },
+                Response.ErrorListener { error ->
+                    progress.hide()
+                    Log.d("API_M", "error => $error")
+                    Toast.makeText(
+                        this, "Error code: $error",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            ) {
+                override fun getParams(): MutableMap<String, String> {
+                    val params: MutableMap<String, String> = HashMap()
+                    params["email"] = email
+                    params["firstName"] = firstName
+                    params["lastName"] = lastName
+                    params["phoneNumber"] = phoneNumber
+                    params["password"] = password
+                    return params
+                }
+            }
+        queue.add(stringReq)
     }
     override fun afterTextChanged(s: Editable) {}
     override fun beforeTextChanged(
